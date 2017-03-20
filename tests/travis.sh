@@ -21,6 +21,8 @@ cd tests/plugins
 "$PHP_BINARY" ./PocketMine-DevTools/src/DevTools/ConsoleScript.php --make ./PocketMine-DevTools --relative ./PocketMine-DevTools --out ../../DevTools.phar
 cd ../..
 
+rm PocketMine-MP.phar
+
 "$PHP_BINARY" DevTools.phar --make src,vendor --relative ./ --entry src/pocketmine/PocketMine.php --out PocketMine-MP.phar
 if [ -f PocketMine-MP.phar ]; then
     echo Server phar created successfully.
@@ -29,7 +31,7 @@ else
     exit 1
 fi
 
-mkdir plugins
+mkdir plugins 2> /dev/null
 mv DevTools.phar plugins
 
 echo -e "version\nplugins\nstop\n" | "$PHP_BINARY" PocketMine-MP.phar --no-wizard --disable-ansi --disable-readline --debug.level=2
@@ -37,5 +39,8 @@ echo -e "version\nplugins\nstop\n" | "$PHP_BINARY" PocketMine-MP.phar --no-wizar
 result=$?
 if [ $result -ne 0 ]; then
 	echo PocketMine-MP phar test exited with code $result
+	exit 1
+elif [ $(grep -c "ERROR\|CRITICAL\|EMERGENCY" server.log) -ne 0 ]; then
+	echo Server log contains error messages, changing build status to failed
 	exit 1
 fi
