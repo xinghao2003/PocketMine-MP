@@ -358,8 +358,9 @@ abstract class Entity extends Location implements Metadatable{
 			$this->namedtag->Rotation[1]
 		);
 
-
 		$this->setMotion($this->temporalVector->setComponents($this->namedtag["Motion"][0], $this->namedtag["Motion"][1], $this->namedtag["Motion"][2]));
+
+		$this->resetLastMovements();
 
 		assert(!is_nan($this->x) and !is_infinite($this->x) and !is_nan($this->y) and !is_infinite($this->y) and !is_nan($this->z) and !is_infinite($this->z));
 
@@ -1738,6 +1739,12 @@ abstract class Entity extends Location implements Metadatable{
 		$this->checkChunks();
 
 		return true;
+	}
+
+	protected function resetLastMovements(){
+		list($this->lastX, $this->lastY, $this->lastZ) = [$this->x, $this->y, $this->z];
+		list($this->lastYaw, $this->lastPitch) = [$this->yaw, $this->pitch];
+		list($this->lastMotionX, $this->lastMotionY, $this->lastMotionZ) = [$this->motionX, $this->motionY, $this->motionZ];
 	}
 
 	public function getMotion(){
