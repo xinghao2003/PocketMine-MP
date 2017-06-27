@@ -107,7 +107,14 @@ class HelpCommand extends VanillaCommand{
 		}
 	}
 
+	/**
+	 * Sets the size of help pages seen by clients.
+	 * @param int $size
+	 */
 	public function setPageSize(int $size){
+		if($size < 1){
+			throw new \InvalidArgumentException("Page size must be greater than zero");
+		}
 		$this->pageSize = $size;
 	}
 
