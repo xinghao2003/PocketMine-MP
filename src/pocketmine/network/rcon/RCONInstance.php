@@ -25,6 +25,7 @@ namespace pocketmine\network\rcon;
 
 use pocketmine\Thread;
 use pocketmine\utils\Binary;
+use pocketmine\utils\MainLogger;
 
 class RCONInstance extends Thread{
 	public $stop;
@@ -135,6 +136,27 @@ class RCONInstance extends Thread{
 						}
 
 						switch($packetType){
+							case 9: //Protocol check
+								if($this->{"status" . $n} !== 1){
+									$this->{"status" . $n} = -1;
+									continue;
+								}
+								$this->writePacket($client, $requestID, 0, RCON::PROTOCOL_VERSION);
+								$this->response = "";
+								if($payload == RCON::PROTOCOL_VERSION) $this->logger->setSendMsg(true); //GeniRCON output
+								break;
+							case 4: //Logger
+								if($this->{"status" . $n} !== 1){
+									$this->{"status" . $n} = -1;
+									continue;
+								}
+								$res = (array) [
+									"serverStatus" => unserialize($this->serverStatus),
+									"logger" => str_replace("\n", "\r\n", trim($this->logger->getMessages()))
+								];
+								$this->writePacket($client, $requestID, 0, serialize($res));
+								$this->response = "";
+								break;
 							case 3: //Login
 								if($this->{"status" . $n} !== 0){
 									$this->{"status" . $n} = -1;
