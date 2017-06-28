@@ -24,6 +24,9 @@ declare(strict_types=1);
 /**
  * Implementation of the Source RCON Protocol to allow remote console commands
  * Source: https://developer.valvesoftware.com/wiki/Source_RCON_Protocol
+ *
+ * Implementation of the GeniRCON Protocol to allow full remote console access
+ * Source: https://github.com/iTXTech/GeniRCON
  */
 namespace pocketmine\network\rcon;
 
@@ -31,8 +34,10 @@ use pocketmine\command\RemoteConsoleCommandSender;
 use pocketmine\event\server\RemoteServerCommandEvent;
 use pocketmine\Server;
 use pocketmine\utils\TextFormat;
+use pocketmine\utils\Utils;
 
 class RCON{
+	const PROTOCOL_VERSION = 3;
 	/** @var Server */
 	private $server;
 	private $socket;
@@ -48,6 +53,7 @@ class RCON{
 		$this->server->getLogger()->info("Starting remote control listener");
 		if($this->password === ""){
 			throw new \InvalidArgumentException("Empty password");
+			return;
 		}
 
 		$this->threads = (int) max(1, $threads);
@@ -56,12 +62,14 @@ class RCON{
 
 		if($this->socket === false or !@socket_bind($this->socket, $interface, (int) $port) or !@socket_listen($this->socket)){
 			throw new \RuntimeException(trim(socket_strerror(socket_last_error())));
+			$this->threads = 0;
+			return;
 		}
 
 		socket_set_block($this->socket);
 
 		for($n = 0; $n < $this->threads; ++$n){
-			$this->workers[$n] = new RCONInstance($this->socket, $this->password, $this->clientsPerThread);
+			$this->workers[$n] = new RCONInstance($this->server->getLogger(), $this->socket, $this->password, $this->clientsPerThread);
 		}
 
 		socket_getsockname($this->socket, $addr, $port);
@@ -72,6 +80,7 @@ class RCON{
 		for($n = 0; $n < $this->threads; ++$n){
 			$this->workers[$n]->close();
 			Server::microSleep(50000);
+			$this->workers[$n]->close();
 			$this->workers[$n]->quit();
 		}
 		@socket_close($this->socket);
@@ -79,7 +88,22 @@ class RCON{
 	}
 
 	public function check(){
+		$d = Utils::getRealMemoryUsage();
+		$u = Utils::getMemoryUsage(true);
+		$usage = round(($u[0] / 1024) / 1024, 2) . "/" . round(($d[0] / 1024) / 1024, 2) . "/" . round(($u[1] / 1024) / 1024, 2) . "/" . round(($u[2] / 1024) / 1024, 2) . " MB @ " . Utils::getThreadCount() . " threads";
+		$serverStatus = serialize([
+			"online" => count($this->server->getOnlinePlayers()),
+			"max" => $this->server->getMaxPlayers(),
+			"upload" => round($this->server->getNetwork()->getUpload() / 1024, 2),
+			"download" => round($this->server->getNetwork()->getDownload() / 1024, 2),
+			"tps" => $this->server->getTicksPerSecondAverage(),
+			"load" => $this->server->getTickUsageAverage(),
+			"usage" => $usage
+		]);
 		for($n = 0; $n < $this->threads; ++$n){
+			if(!$this->workers[$n]->isTerminated()){
+				$this->workers[$n]->serverStatus = $serverStatus;
+			}
 			if($this->workers[$n]->isTerminated() === true){
 				$this->workers[$n] = new RCONInstance($this->socket, $this->password, $this->clientsPerThread);
 			}elseif($this->workers[$n]->isWaiting()){
